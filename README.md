@@ -692,3 +692,42 @@ pyinstaller --onefile --windowed --icon=app.ico main.py
 3. 使用环境变量或配置文件存储敏感信息
 4. 请勿在公共网络使用此工具
 5. 定期备份数据库 
+
+## 版本控制说明
+
+本项目使用Git进行版本控制，已完成初始化配置。主要分支为`main`，作为稳定版本分支。
+
+### 常用Git命令
+
+```bash
+# 查看当前状态
+git status
+
+# 添加修改到暂存区
+git add .                   # 添加所有文件
+git add <文件名>            # 添加指定文件
+
+# 提交修改
+git commit -m "提交说明"    # 提交已暂存的修改
+
+# 查看提交历史
+git log                     # 查看详细历史
+git log --oneline           # 查看简洁历史
+
+# 创建新分支
+git branch <分支名>         # 创建新分支
+git checkout <分支名>       # 切换到指定分支
+git checkout -b <分支名>    # 创建并切换到新分支
+
+# 合并分支
+git merge <分支名>          # 将指定分支合并到当前分支
+
+# 推送到远程仓库
+git remote add origin <远程仓库URL>  # 添加远程仓库
+git push -u origin main              # 首次推送
+git push                             # 后续推送
+```
+
+## 项目介绍
+
+// ... 原有内容保留 ... 
