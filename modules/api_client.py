@@ -10,11 +10,17 @@ class ApiClient:
     def __init__(self, cache_dir='./cache', download_dir='./Downloads'):
         self.cache_dir = cache_dir
         self.download_dir = download_dir
+        self.orders_dir = os.path.join(download_dir, 'orders')
+        self.service_dir = os.path.join(download_dir, 'service')
         
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         if not os.path.exists(download_dir):
             os.makedirs(download_dir)
+        if not os.path.exists(self.orders_dir):
+            os.makedirs(self.orders_dir)
+        if not os.path.exists(self.service_dir):
+            os.makedirs(self.service_dir)
             
         self.cookie_path = os.path.join(cache_dir, 'cookies.json')
         self.cookies = self.load_cookies()
@@ -86,9 +92,17 @@ class ApiClient:
         except Exception as e:
             return {"success": False, "message": f"请求异常: {str(e)}"}
     
-    def download_order_list(self):
+    def download_order_list(self, orders_dir=None):
         """下载订单列表"""
         url = "https://gmall.jd.com/api/batchTask/list"
+        
+        # 如果没有提供订单目录，使用默认的
+        if orders_dir is None:
+            orders_dir = self.orders_dir
+        
+        # 确保目录存在
+        if not os.path.exists(orders_dir):
+            os.makedirs(orders_dir)
         
         # 刷新cookies
         self.cookies = self.load_cookies()
@@ -137,13 +151,13 @@ class ApiClient:
                     download_response = requests.get(file_url)
                     if download_response.status_code == 200:
                         # 确保使用标准化的路径分隔符
-                        download_dir = os.path.abspath(self.download_dir)
+                        download_dir = os.path.abspath(orders_dir)
                         file_path = os.path.join(download_dir, file_name)
                         
                         with open(file_path, 'wb') as f:
                             f.write(download_response.content)
                             
-                        return {"success": True, "file_path": file_path}
+                        return {"success": True, "message": f"订单列表下载成功，文件保存在: {file_path}", "file_path": file_path}
                     else:
                         return {"success": False, "message": f"下载文件失败，状态码: {download_response.status_code}"}
                 else:

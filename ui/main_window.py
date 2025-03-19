@@ -21,6 +21,13 @@ class MainWindow(QMainWindow):
     delete_config_signal = pyqtSignal(str)  # 账号名称
     update_db_config_signal = pyqtSignal()  # 数据库配置更新信号
     
+    # 新增服务单相关信号
+    generate_service_signal = pyqtSignal(str, str)  # 开始日期、结束日期
+    download_service_signal = pyqtSignal()
+    upload_service_signal = pyqtSignal()
+    clear_orders_signal = pyqtSignal()  # 清空订单文件
+    clear_service_signal = pyqtSignal()  # 清空服务单文件
+    
     def __init__(self):
         super().__init__()
         self.initUI()
@@ -107,33 +114,67 @@ class MainWindow(QMainWindow):
         self.end_date.setDate(QDate.currentDate())
         self.end_date.setCalendarPopup(True)
         
-        # 功能按钮
+        # 订单相关功能按钮 - 第一行
         self.generate_button = QPushButton("生成订单列表")
         self.generate_button.clicked.connect(self.on_generate_clicked)
         
         self.download_button = QPushButton("下载订单列表")
         self.download_button.clicked.connect(self.on_download_clicked)
         
-        self.upload_button = QPushButton("上传到数据库")
+        # 订单相关功能按钮 - 第二行
+        self.upload_button = QPushButton("上传订单列表")
         self.upload_button.clicked.connect(self.on_upload_clicked)
         
-        self.clear_button = QPushButton("清理缓存")
-        self.clear_button.clicked.connect(self.on_clear_cache_clicked)
+        self.clear_orders_button = QPushButton("清空订单文件")
+        self.clear_orders_button.clicked.connect(self.on_clear_orders_clicked)
+        
+        # 添加分隔线
+        self.separator = QFrame()
+        self.separator.setFrameShape(QFrame.Shape.HLine)
+        self.separator.setFrameShadow(QFrame.Shadow.Sunken)
+        
+        # 服务单相关功能按钮 - 第一行
+        self.generate_service_button = QPushButton("生成服务单")
+        self.generate_service_button.clicked.connect(self.on_generate_service_clicked)
+        
+        self.download_service_button = QPushButton("下载服务单")
+        self.download_service_button.clicked.connect(self.on_download_service_clicked)
+        
+        # 服务单相关功能按钮 - 第二行
+        self.upload_service_button = QPushButton("上传服务单")
+        self.upload_service_button.clicked.connect(self.on_upload_service_clicked)
+        
+        self.clear_service_button = QPushButton("清空服务单文件")
+        self.clear_service_button.clicked.connect(self.on_clear_service_clicked)
         
         # 初始禁用需要登录才能使用的按钮
         self.generate_button.setEnabled(False)
         self.download_button.setEnabled(False)
         self.upload_button.setEnabled(False)
+        self.generate_service_button.setEnabled(False)
+        self.download_service_button.setEnabled(False)
+        self.upload_service_button.setEnabled(False)
         
         # 添加控件到布局
         function_layout.addWidget(self.start_date_label, 0, 0)
         function_layout.addWidget(self.start_date, 0, 1)
         function_layout.addWidget(self.end_date_label, 0, 2)
         function_layout.addWidget(self.end_date, 0, 3)
+        
+        # 添加第一组功能按钮（订单相关）
         function_layout.addWidget(self.generate_button, 1, 0, 1, 2)
         function_layout.addWidget(self.download_button, 1, 2, 1, 2)
         function_layout.addWidget(self.upload_button, 2, 0, 1, 2)
-        function_layout.addWidget(self.clear_button, 2, 2, 1, 2)
+        function_layout.addWidget(self.clear_orders_button, 2, 2, 1, 2)
+        
+        # 添加分隔线
+        function_layout.addWidget(self.separator, 3, 0, 1, 4)
+        
+        # 添加第二组功能按钮（服务单相关）
+        function_layout.addWidget(self.generate_service_button, 4, 0, 1, 2)
+        function_layout.addWidget(self.download_service_button, 4, 2, 1, 2)
+        function_layout.addWidget(self.upload_service_button, 5, 0, 1, 2)
+        function_layout.addWidget(self.clear_service_button, 5, 2, 1, 2)
         
         function_group.setLayout(function_layout)
         main_layout.addWidget(function_group)
@@ -151,7 +192,7 @@ class MainWindow(QMainWindow):
         
         # 设置各组件的比例
         main_layout.setStretch(0, 2)  # 账号信息
-        main_layout.setStretch(1, 2)  # 功能模块
+        main_layout.setStretch(1, 3)  # 功能模块
         main_layout.setStretch(2, 5)  # 运行日志
     
     def init_config_tab(self):
@@ -397,6 +438,28 @@ class MainWindow(QMainWindow):
         """清理缓存按钮点击事件"""
         self.clear_cache_signal.emit()
     
+    def on_clear_orders_clicked(self):
+        """清空订单文件按钮点击事件"""
+        self.clear_orders_signal.emit()
+    
+    def on_generate_service_clicked(self):
+        """生成服务单按钮点击事件"""
+        start_date = self.start_date.date().toString("yyyy-MM-dd")
+        end_date = self.end_date.date().toString("yyyy-MM-dd")
+        self.generate_service_signal.emit(start_date, end_date)
+    
+    def on_download_service_clicked(self):
+        """下载服务单按钮点击事件"""
+        self.download_service_signal.emit()
+    
+    def on_upload_service_clicked(self):
+        """上传服务单按钮点击事件"""
+        self.upload_service_signal.emit()
+    
+    def on_clear_service_clicked(self):
+        """清空服务单文件按钮点击事件"""
+        self.clear_service_signal.emit()
+    
     def on_save_config_clicked(self):
         """保存配置按钮点击事件"""
         account_name = self.account_name_edit.text().strip()
@@ -457,6 +520,9 @@ class MainWindow(QMainWindow):
         self.generate_button.setEnabled(enabled)
         self.download_button.setEnabled(enabled)
         self.upload_button.setEnabled(enabled)
+        self.generate_service_button.setEnabled(enabled)
+        self.download_service_button.setEnabled(enabled)
+        self.upload_service_button.setEnabled(enabled)
     
     def add_account_to_combos(self, account_name):
         """向选择框中添加新账号"""
@@ -582,16 +648,40 @@ class MainWindow(QMainWindow):
                 else:
                     schema_text += f"{col_name}: {data_type}\n"
             
+            # 获取服务单表结构
+            schema_text += "\n\n=== 服务单表 (jx_service_orders) ===\n\n"
+            cursor.execute("IF EXISTS (SELECT * FROM sysobjects WHERE name='jx_service_orders' AND xtype='U') SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jx_service_orders' ORDER BY ORDINAL_POSITION")
+            
+            service_table_exists = False
+            for row in cursor.fetchall():
+                service_table_exists = True
+                col_name = row.COLUMN_NAME
+                data_type = row.DATA_TYPE
+                length = row.CHARACTER_MAXIMUM_LENGTH
+                
+                if length:
+                    schema_text += f"{col_name}: {data_type}({length})\n"
+                else:
+                    schema_text += f"{col_name}: {data_type}\n"
+            
+            if not service_table_exists:
+                schema_text += "(服务单表尚未创建)\n"
+            
             # 获取记录计数
+            schema_text += f"\n\n=== 数据统计 ===\n"
+            
             cursor.execute("SELECT COUNT(*) AS count FROM jx_orders_master")
             master_count = cursor.fetchone().count
+            schema_text += f"主表记录数: {master_count}\n"
             
             cursor.execute("SELECT COUNT(*) AS count FROM jx_orders_detail")
             detail_count = cursor.fetchone().count
-            
-            schema_text += f"\n\n=== 数据统计 ===\n"
-            schema_text += f"主表记录数: {master_count}\n"
             schema_text += f"明细表记录数: {detail_count}\n"
+            
+            # 获取服务单表记录数
+            cursor.execute("IF EXISTS (SELECT * FROM sysobjects WHERE name='jx_service_orders' AND xtype='U') SELECT COUNT(*) AS count FROM jx_service_orders ELSE SELECT 0 AS count")
+            service_count = cursor.fetchone().count
+            schema_text += f"服务单表记录数: {service_count}\n"
             
             conn.close()
             
@@ -644,7 +734,7 @@ class MainWindow(QMainWindow):
         container_layout.addWidget(title_label)
         
         # 添加版本信息
-        version_label = QLabel("版本: 1.0.0")
+        version_label = QLabel("版本: 1.2.0")
         if is_dark:
             version_label.setStyleSheet("font-size: 14px; color: #aaaaaa;")
         else:

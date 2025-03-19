@@ -35,10 +35,17 @@ def load_db_config():
 CONFIG = {
     'paths': {
         'cache_dir': os.path.join(BASE_DIR, 'cache'),
-        'download_dir': os.path.join(BASE_DIR, 'Downloads')
+        'download_dir': os.path.join(BASE_DIR, 'Downloads'),
+        'orders_dir': os.path.join(BASE_DIR, 'Downloads', 'orders'),
+        'service_dir': os.path.join(BASE_DIR, 'Downloads', 'service')
     },
     'jd': {
         'username': '',  # 不再在此存储敏感信息
         'password': ''   # 不再在此存储敏感信息
     }
-} 
+}
+
+# 确保所需目录存在
+for path in CONFIG['paths'].values():
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True) 

@@ -14,6 +14,7 @@ from PyQt6.QtCore import QDate, Qt, QObject, QThread, pyqtSignal, pyqtSlot
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import json
+import requests
 
 from ui import MainWindow, VerificationDialog
 from modules import BrowserAutomation, ApiClient, DataProcessor, DatabaseManager, CacheManager, AccountManager
@@ -125,6 +126,13 @@ class MainApp(QObject):
         self.window.upload_signal.connect(self.upload_to_database)
         self.window.clear_cache_signal.connect(self.clear_cache)
         
+        # 新增信号连接
+        self.window.clear_orders_signal.connect(self.clear_orders_files)
+        self.window.generate_service_signal.connect(self.generate_service_list)
+        self.window.download_service_signal.connect(self.download_service_list)
+        self.window.upload_service_signal.connect(self.upload_service_to_database)
+        self.window.clear_service_signal.connect(self.clear_service_files)
+        
         # 账号配置信号
         self.window.save_config_signal.connect(self.save_account_config)
         self.window.delete_config_signal.connect(self.delete_account_config)
@@ -134,7 +142,7 @@ class MainApp(QObject):
         
         # 注册应用退出事件
         self.app.aboutToQuit.connect(self.on_quit)
-    
+
     def login(self, account_name):
         """登录处理方法，连接到UI的信号"""
         self.login_jd(account_name)
@@ -255,62 +263,67 @@ class MainApp(QObject):
         """下载订单列表"""
         logger.info(f"开始为账号 {account_name} 下载订单列表")
         
-        result = self.api_client.download_order_list()
+        # 将下载路径修改为orders子文件夹
+        orders_dir = CONFIG['paths']['orders_dir']
+        if not os.path.exists(orders_dir):
+            os.makedirs(orders_dir)
+        
+        result = self.api_client.download_order_list(orders_dir)
         
         if result.get('success'):
-            status_message = f"下载订单列表成功，文件保存在: {result.get('file_path')}"
-            logger.info(status_message)
-            self.window.show_message("成功", status_message)
+            logger.info(result.get('message'))
+            self.window.show_message("下载成功", result.get('message'))
         else:
-            status_message = f"下载订单列表失败: {result.get('message')}"
-            logger.error(status_message)
-            self.window.show_message("失败", status_message, QMessageBox.Icon.Warning)
+            logger.error(result.get('message'))
+            self.window.show_message("下载失败", result.get('message'), QMessageBox.Icon.Warning)
     
     def upload_to_database(self):
-        """数据处理与上传"""
-        logger.info("开始处理数据并上传到数据库")
+        """上传订单数据到数据库"""
+        logger.info("开始处理Excel文件并上传到数据库")
         
         # 测试数据库连接
-        logger.info("测试数据库连接...")
-        db_test = self.db_manager.test_connection()
-        if not db_test.get('success'):
-            error_msg = f"数据库连接失败: {db_test.get('message')}"
+        test_result = self.db_manager.test_connection()
+        if not test_result.get('success'):
+            error_msg = f"数据库连接失败: {test_result.get('message')}"
             logger.error(error_msg)
-            self.window.show_message("数据库连接失败", db_test.get('message'), QMessageBox.Icon.Critical)
+            self.window.show_message("数据库连接失败", error_msg, QMessageBox.Icon.Warning)
             return
         
-        # 处理Excel文件
-        logger.info("正在处理Excel文件...")
-        process_result = self.data_processor.process_excel_files()
+        logger.info("数据库连接测试成功")
         
-        if process_result.get('success'):
-            master_count = len(process_result.get('master_data', []))
-            detail_count = len(process_result.get('detail_data', []))
-            logger.info(f"数据处理成功，主表 {master_count} 条记录，明细表 {detail_count} 条记录")
-            logger.info("开始上传数据到数据库...")
-            
-            # 上传数据
-            upload_result = self.db_manager.upload_data(process_result)
-            
-            if upload_result.get('success'):
-                # 获取主表和明细表的上传数量
-                master_uploaded = upload_result.get('master_count', 0)
-                detail_uploaded = upload_result.get('detail_count', 0)
+        # 处理Excel文件
+        orders_dir = CONFIG['paths']['orders_dir']
+        logger.info(f"从 {orders_dir} 目录读取订单Excel文件")
+        
+        try:
+            data_result = self.data_processor.process_order_excel(orders_dir)
+            if not data_result.get('success'):
+                error_msg = f"Excel处理失败: {data_result.get('message')}"
+                logger.error(error_msg)
+                self.window.show_message("处理失败", error_msg, QMessageBox.Icon.Warning)
+                return
                 
-                success_msg = f"数据上传成功，主表：{master_uploaded}条记录，明细表：{detail_uploaded}条记录"
+            logger.info("Excel文件处理成功")
+            
+            # 上传数据到数据库
+            upload_result = self.db_manager.upload_data(data_result)
+            if upload_result.get('success'):
+                success_msg = upload_result.get('message')
                 logger.info(success_msg)
                 self.window.show_message("上传成功", success_msg)
             else:
-                logger.error(upload_result.get('message'))
-                self.window.show_message("上传失败", upload_result.get('message'), QMessageBox.Icon.Warning)
-        else:
-            status_message = f"数据处理失败: {process_result.get('message')}"
-            logger.error(status_message)
-            self.window.show_message("失败", status_message, QMessageBox.Icon.Warning)
+                error_msg = f"数据上传失败: {upload_result.get('message')}"
+                logger.error(error_msg)
+                self.window.show_message("上传失败", error_msg, QMessageBox.Icon.Warning)
+                
+        except Exception as e:
+            error_msg = f"上传过程中发生错误: {str(e)}"
+            logger.error(error_msg)
+            self.window.show_message("上传错误", error_msg, QMessageBox.Icon.Critical)
     
     def clear_cache(self):
         """清除缓存"""
-        logger.info("开始清除缓存")
+        logger.info("开始清除登录缓存")
         
         result = self.cache_manager.clear_cache()
         
@@ -321,6 +334,336 @@ class MainApp(QObject):
         else:
             logger.error(result.get('message'))
             self.window.show_message("清除失败", result.get('message'), QMessageBox.Icon.Warning)
+    
+    def clear_orders_files(self):
+        """清空订单文件夹"""
+        logger.info("开始清空订单文件")
+        
+        result = self.cache_manager.clear_orders_files()
+        
+        if result.get('success'):
+            logger.info(result.get('message'))
+            self.window.show_message("清除成功", result.get('message'))
+        else:
+            logger.error(result.get('message'))
+            self.window.show_message("清除失败", result.get('message'), QMessageBox.Icon.Warning)
+    
+    def clear_service_files(self):
+        """清空服务单文件夹"""
+        logger.info("开始清空服务单文件")
+        
+        result = self.cache_manager.clear_service_files()
+        
+        if result.get('success'):
+            logger.info(result.get('message'))
+            self.window.show_message("清除成功", result.get('message'))
+        else:
+            logger.error(result.get('message'))
+            self.window.show_message("清除失败", result.get('message'), QMessageBox.Icon.Warning)
+    
+    def generate_service_list(self, start_date, end_date):
+        """生成服务单列表"""
+        logger.info(f"开始生成服务单列表，时间范围: {start_date} 至 {end_date}")
+        
+        # 从cache/cookies.json获取cookies
+        cookie_file = os.path.join(CONFIG['paths']['cache_dir'], 'cookies.json')
+        if not os.path.exists(cookie_file):
+            error_msg = "Cookie文件不存在，请先进行登录"
+            logger.error(error_msg)
+            self.window.show_message("生成失败", error_msg, QMessageBox.Icon.Warning)
+            return
+        
+        try:
+            with open(cookie_file, 'r', encoding='utf-8') as f:
+                cookies_data = json.load(f)
+            
+            # 构建cookie字符串
+            cookie_str = '; '.join([f"{cookie['name']}={cookie['value']}" for cookie in cookies_data])
+            
+            # 准备请求参数
+            start_time = f"{start_date} 00:00:00"
+            end_time = f"{end_date} 23:59:59"
+            
+            payload = {
+                "startCreatedTime": start_time,
+                "endCreatedTime": end_time
+            }
+            
+            # 设置请求头
+            headers = {
+                'authority': 'gmall.jd.com',
+                'method': 'POST',
+                'path': '/api/afs/query/exportAfsService',
+                'scheme': 'https',
+                'accept': 'application/json, text/plain, */*',
+                'accept-encoding': 'gzip, deflate, br, zstd',
+                'accept-language': 'zh-CN,zh;q=0.9',
+                'content-type': 'application/json',
+                'cookie': cookie_str,
+                'origin': 'https://gongxiao.jd.com',
+                'referer': 'https://gongxiao.jd.com/',
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+            }
+            
+            # 发送请求
+            response = requests.post(
+                'https://gmall.jd.com/api/afs/query/exportAfsService',
+                json=payload,
+                headers=headers
+            )
+            
+            result = response.json()
+            
+            if result.get('success') == True and result.get('message') == "成功":
+                logger.info(f"服务单生成请求成功: {result.get('message')}")
+                self.window.show_message("生成成功", f"服务单生成请求成功，可以点击下载服务单按钮进行下载")
+            else:
+                logger.error(f"服务单生成请求失败: {result}")
+                self.window.show_message("生成失败", f"服务单生成请求失败: {result.get('message', '未知错误')}", QMessageBox.Icon.Warning)
+                
+        except Exception as e:
+            error_msg = f"生成服务单时发生错误: {str(e)}"
+            logger.error(error_msg)
+            self.window.show_message("生成失败", error_msg, QMessageBox.Icon.Critical)
+    
+    def download_service_list(self):
+        """下载服务单列表"""
+        logger.info("开始下载服务单列表")
+        
+        # 从cache/cookies.json获取cookies
+        cookie_file = os.path.join(CONFIG['paths']['cache_dir'], 'cookies.json')
+        if not os.path.exists(cookie_file):
+            error_msg = "Cookie文件不存在，请先进行登录"
+            logger.error(error_msg)
+            self.window.show_message("下载失败", error_msg, QMessageBox.Icon.Warning)
+            return
+        
+        try:
+            with open(cookie_file, 'r', encoding='utf-8') as f:
+                cookies_data = json.load(f)
+            
+            # 构建cookie字符串
+            cookie_str = '; '.join([f"{cookie['name']}={cookie['value']}" for cookie in cookies_data])
+            
+            # 设置请求头
+            headers = {
+                'authority': 'gmall.jd.com',
+                'method': 'POST',
+                'path': '/api/afs/query/queryExportResult',
+                'scheme': 'https',
+                'accept': 'application/json, text/plain, */*',
+                'content-type': 'application/json',
+                'cookie': cookie_str,
+                'origin': 'https://gongxiao.jd.com',
+                'referer': 'https://gongxiao.jd.com/',
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+            }
+            
+            # 发送请求
+            response = requests.post(
+                'https://gmall.jd.com/api/afs/query/queryExportResult',
+                json={},
+                headers=headers
+            )
+            
+            result = response.json()
+            
+            if result.get('success') == True and result.get('message') == "成功" and result.get('data'):
+                # 从响应中提取下载链接
+                download_url = result.get('data')[0].get('url')
+                if download_url:
+                    # 下载文件
+                    service_dir = CONFIG['paths']['service_dir']
+                    if not os.path.exists(service_dir):
+                        os.makedirs(service_dir)
+                    
+                    # 生成文件名：服务单_当前日期.xls
+                    current_date = datetime.now().strftime('%Y%m%d%H%M%S')
+                    filename = os.path.join(service_dir, f"服务单_{current_date}.xls")
+                    
+                    # 下载文件
+                    file_response = requests.get(download_url)
+                    with open(filename, 'wb') as f:
+                        f.write(file_response.content)
+                    
+                    logger.info(f"服务单下载成功，已保存到: {filename}")
+                    self.window.show_message("下载成功", f"服务单文件已保存到: {filename}")
+                else:
+                    logger.error("下载链接不存在")
+                    self.window.show_message("下载失败", "下载链接不存在，请先生成服务单", QMessageBox.Icon.Warning)
+            else:
+                logger.error(f"服务单下载请求失败: {result}")
+                self.window.show_message("下载失败", f"服务单下载请求失败: {result.get('message', '未知错误')}", QMessageBox.Icon.Warning)
+                
+        except Exception as e:
+            error_msg = f"下载服务单时发生错误: {str(e)}"
+            logger.error(error_msg)
+            self.window.show_message("下载失败", error_msg, QMessageBox.Icon.Critical)
+    
+    def upload_service_to_database(self):
+        """上传服务单数据到数据库"""
+        logger.info("开始处理服务单Excel文件并上传到数据库")
+        
+        # 测试数据库连接
+        test_result = self.db_manager.test_connection()
+        if not test_result.get('success'):
+            error_msg = f"数据库连接失败: {test_result.get('message')}"
+            logger.error(error_msg)
+            self.window.show_message("数据库连接失败", error_msg, QMessageBox.Icon.Warning)
+            return
+        
+        logger.info("数据库连接测试成功")
+        
+        # 处理服务单Excel文件
+        service_dir = CONFIG['paths']['service_dir']
+        logger.info(f"从 {service_dir} 目录读取服务单Excel文件")
+        
+        try:
+            # 创建服务单表
+            service_table_sql = """
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='jx_service_orders' AND xtype='U')
+                CREATE TABLE jx_service_orders (
+                    service_no NVARCHAR(50) PRIMARY KEY,
+                    purchase_order_no NVARCHAR(50),
+                    customer_expectation NVARCHAR(255),
+                    service_status NVARCHAR(50),
+                    supplier_id NVARCHAR(50),
+                    supplier_store_name NVARCHAR(100),
+                    distributor_id NVARCHAR(50),
+                    distributor_store_name NVARCHAR(100),
+                    product_name NVARCHAR(255),
+                    product_quantity INT,
+                    purchase_amount DECIMAL(10, 2),
+                    customer_name NVARCHAR(50),
+                    contact_phone NVARCHAR(50),
+                    shipping_address NVARCHAR(255),
+                    customer_feedback NVARCHAR(255),
+                    created_at DATETIME,
+                    return_method NVARCHAR(50),
+                    service_reason NVARCHAR(255),
+                    return_tracking_no NVARCHAR(50),
+                    order_id NVARCHAR(50),
+                    sales_store_front NVARCHAR(100),
+                    order_type NVARCHAR(50),
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            
+            # 连接数据库并创建表
+            conn = self.db_manager.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(service_table_sql)
+            conn.commit()
+            
+            # 查找所有xls文件
+            files_processed = 0
+            total_records = 0
+            
+            for file in os.listdir(service_dir):
+                if file.endswith('.xls') or file.endswith('.xlsx'):
+                    file_path = os.path.join(service_dir, file)
+                    logger.info(f"处理文件: {file_path}")
+                    
+                    # 使用pandas读取Excel文件
+                    import pandas as pd
+                    df = pd.read_excel(file_path)
+                    
+                    # 字段映射
+                    column_mapping = {
+                        '采购单号': 'purchase_order_no',
+                        '服务单号': 'service_no',
+                        '用户期望': 'customer_expectation',
+                        '服务单状态': 'service_status',
+                        '供应商编号': 'supplier_id',
+                        '供应商店铺名称': 'supplier_store_name',
+                        '分销商编号': 'distributor_id',
+                        '分销商店铺名称': 'distributor_store_name',
+                        '产品名称': 'product_name',
+                        '产品数量': 'product_quantity',
+                        '采购金额': 'purchase_amount',
+                        '顾客姓名': 'customer_name',
+                        '联系方式': 'contact_phone',
+                        '收货地址': 'shipping_address',
+                        '用户意见': 'customer_feedback',
+                        '服务单创建时间': 'created_at',
+                        '返件方式': 'return_method',
+                        '申请原因': 'service_reason',
+                        '客户寄回物流单号': 'return_tracking_no',
+                        '订单号': 'order_id',
+                        '前台销售店铺': 'sales_store_front',
+                        '订单类型': 'order_type'
+                    }
+                    
+                    # 重命名列
+                    for old_col, new_col in column_mapping.items():
+                        if old_col in df.columns:
+                            df.rename(columns={old_col: new_col}, inplace=True)
+                    
+                    # 确保服务单号列存在
+                    if 'service_no' not in df.columns:
+                        logger.error(f"文件 {file} 缺少服务单号列，跳过")
+                        continue
+                    
+                    # 如果数据为空，跳过
+                    if df.empty:
+                        logger.warning(f"文件 {file} 中没有数据，跳过")
+                        continue
+                    
+                    # 收集所有服务单号
+                    service_nos = df['service_no'].unique().tolist()
+                    
+                    # 删除已有的相同服务单号记录
+                    if service_nos:
+                        placeholders = ','.join(['?' for _ in service_nos])
+                        delete_sql = f"DELETE FROM jx_service_orders WHERE service_no IN ({placeholders})"
+                        cursor.execute(delete_sql, service_nos)
+                        rows_deleted = cursor.rowcount
+                        logger.info(f"已删除 {rows_deleted} 条旧服务单记录")
+                    
+                    # 上传新数据
+                    records_count = 0
+                    
+                    for _, row in df.iterrows():
+                        # 准备列名和值
+                        columns = [col for col in row.index if col in column_mapping.values() and pd.notna(row[col])]
+                        values = [row[col] for col in columns]
+                        
+                        # 跳过没有服务单号的记录
+                        if 'service_no' not in columns or not values[columns.index('service_no')]:
+                            continue
+                        
+                        # 构建SQL
+                        column_str = ', '.join(columns)
+                        placeholders = ', '.join(['?' for _ in columns])
+                        sql = f"INSERT INTO jx_service_orders ({column_str}) VALUES ({placeholders})"
+                        
+                        try:
+                            cursor.execute(sql, values)
+                            records_count += 1
+                        except Exception as e:
+                            logger.error(f"插入记录时出错: {str(e)}")
+                    
+                    # 提交事务
+                    conn.commit()
+                    logger.info(f"文件 {file} 处理完成，已上传 {records_count} 条记录")
+                    total_records += records_count
+                    files_processed += 1
+            
+            # 关闭连接
+            conn.close()
+            
+            if files_processed > 0:
+                success_msg = f"服务单上传完成，共处理 {files_processed} 个文件，上传 {total_records} 条记录"
+                logger.info(success_msg)
+                self.window.show_message("上传成功", success_msg)
+            else:
+                logger.warning("没有找到服务单文件")
+                self.window.show_message("上传提示", "没有找到可上传的服务单文件", QMessageBox.Icon.Information)
+                
+        except Exception as e:
+            error_msg = f"上传服务单时发生错误: {str(e)}"
+            logger.error(error_msg)
+            self.window.show_message("上传失败", error_msg, QMessageBox.Icon.Critical)
     
     def save_account_config(self, config):
         """保存账号配置"""

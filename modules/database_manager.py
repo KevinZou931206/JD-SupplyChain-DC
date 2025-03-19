@@ -19,6 +19,15 @@ class DatabaseManager:
         self.connection_string = f'DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};Connection Timeout={timeout}'
         self.conn_str_sqlalchemy = f'mssql+pyodbc://{username}:{password}@{server}/{database}?driver=SQL+Server&timeout={timeout}'
         
+    def get_connection(self):
+        """获取数据库连接"""
+        try:
+            conn = pyodbc.connect(self.connection_string)
+            return conn
+        except Exception as e:
+            logger.error(f"获取数据库连接失败: {str(e)}")
+            raise
+        
     def test_connection(self):
         """测试数据库连接"""
         try:

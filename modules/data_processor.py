@@ -10,17 +10,28 @@ logger = logging.getLogger('DataProcessor')
 class DataProcessor:
     def __init__(self, download_dir='./Downloads'):
         self.download_dir = download_dir
+        self.orders_dir = os.path.join(download_dir, 'orders')
+        self.service_dir = os.path.join(download_dir, 'service')
+        
+        # 确保目录存在
         if not os.path.exists(download_dir):
             os.makedirs(download_dir)
+        if not os.path.exists(self.orders_dir):
+            os.makedirs(self.orders_dir)
+        if not os.path.exists(self.service_dir):
+            os.makedirs(self.service_dir)
+
+    def process_order_excel(self, orders_dir=None):
+        """处理订单目录中的Excel文件，分离为主表和明细表"""
+        if orders_dir is None:
+            orders_dir = self.orders_dir
             
-    def process_excel_files(self):
-        """处理下载的Excel文件，分离为主表和明细表"""
-        logger.info(f"开始处理Excel文件，路径: {self.download_dir}")
+        logger.info(f"开始处理订单Excel文件，路径: {orders_dir}")
         
         # 查找Excel文件
-        excel_files = glob.glob(os.path.join(self.download_dir, '*.xls'))
+        excel_files = glob.glob(os.path.join(orders_dir, '*.xls'))
         if not excel_files:
-            excel_files = glob.glob(os.path.join(self.download_dir, '*.xlsx'))
+            excel_files = glob.glob(os.path.join(orders_dir, '*.xlsx'))
             
         if not excel_files:
             logger.warning("未找到Excel文件")
@@ -91,8 +102,19 @@ class DataProcessor:
         for file_path in excel_files:
             try:
                 logger.info(f"处理文件: {os.path.basename(file_path)}")
-                # 读取Excel文件
-                df = pd.read_excel(file_path)
+                # 读取Excel文件时明确指定字符串类型的列
+                df = pd.read_excel(
+                    file_path, 
+                    dtype={
+                        '父SKU': str,
+                        '子SKU': str,
+                        '商家SKU': str,
+                        '订单编号': str,
+                        '物流运单号': str,
+                        '供应商编号': str,
+                        '分销商编号': str
+                    }
+                )
                 
                 logger.info(f"原始数据行数: {len(df)}, 列数: {len(df.columns)}")
                 
@@ -118,6 +140,16 @@ class DataProcessor:
                         # 将空字符串转为0并转换为数值类型
                         df[col] = df[col].replace('', '0')
                         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                
+                # 4. 确保SKU字段为字符串类型
+                sku_columns = ['merchant_sku', 'parent_sku', 'child_sku']
+                for col in sku_columns:
+                    if col in df.columns:
+                        # 处理科学计数法问题：强制转换为字符串并修复科学计数法显示
+                        df[col] = df[col].astype(str).apply(
+                            lambda x: f"{float(x):.0f}" if x.strip() and x.lower() != 'nan' and 'e' in x.lower() else x
+                        )
+                        df[col] = df[col].replace('nan', '')
                 
                 # 创建主表和明细表
                 # 主表只保留一个订单一条记录
@@ -167,4 +199,9 @@ class DataProcessor:
             }
         else:
             logger.warning("没有数据被处理")
-            return {"success": False, "message": "没有数据被处理"} 
+            return {"success": False, "message": "没有数据被处理"}
+            
+    def process_excel_files(self):
+        """处理下载的Excel文件，分离为主表和明细表 (保持向后兼容)"""
+        logger.info("方法已弃用，请使用 process_order_excel() 方法")
+        return self.process_order_excel(self.download_dir) 
