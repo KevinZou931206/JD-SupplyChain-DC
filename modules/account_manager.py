@@ -34,11 +34,12 @@ class AccountManager:
             
             # 更新账号信息
             self.accounts[account_name] = {
-                'username': account_info.get('username', ''),
+                # 确保username使用账号名称
+                'username': account_name,
                 'password': account_info.get('password', ''),
                 'merchant_id': account_info.get('merchant_id', ''),
-                'store_name': account_info.get('store_name', ''),
-                'eid': account_info.get('eid', '')
+                'store_name': account_info.get('store_name', '')
+                # 已移除eid字段
             }
             
             # 保存到文件
@@ -86,9 +87,8 @@ class AccountManager:
             if account_name in self.accounts:
                 account_info = self.accounts[account_name].copy()  # 创建一个副本
                 account_info['account_name'] = account_name
-                # 确保username字段存在
-                if 'username' not in account_info:
-                    account_info['username'] = account_name  # 如果没有username，使用account_name
+                # 确保username字段存在并使用account_name
+                account_info['username'] = account_name
                 return {"success": True, "data": account_info}
             else:
                 return {"success": False, "message": f"账号 {account_name} 不存在"}

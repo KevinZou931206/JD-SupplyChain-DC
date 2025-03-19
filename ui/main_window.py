@@ -211,79 +211,82 @@ class MainWindow(QMainWindow):
         config_layout.setStretch(2, 1)  # 操作按钮
     
     def init_db_config_tab(self):
+        """初始化数据库配置标签页"""
         # 数据库配置页面布局
-        db_config_layout = QVBoxLayout(self.db_config_tab)
+        db_config_layout = QFormLayout(self.db_config_tab)
         
-        # 数据库配置表单
-        db_form_group = QGroupBox("数据库连接信息")
-        db_form_layout = QFormLayout()
+        # 添加说明标签
+        db_intro_label = QLabel("请配置数据库连接信息，所有数据将上传至此数据库", self.db_config_tab)
+        db_intro_label.setWordWrap(True)
+        db_config_layout.addRow(db_intro_label)
         
-        self.db_server_edit = QLineEdit()
-        self.db_name_edit = QLineEdit()
-        self.db_user_edit = QLineEdit()
-        self.db_password_edit = QLineEdit()
-        self.db_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        # 安全提示
+        security_label = QLabel("⚠️ 安全提示：数据库配置信息将保存在单独的JSON文件中，请确保文件安全", self.db_config_tab)
+        security_label.setWordWrap(True)
+        security_label.setStyleSheet("color: red;")
+        db_config_layout.addRow(security_label)
         
-        db_form_layout.addRow("服务器地址:", self.db_server_edit)
-        db_form_layout.addRow("数据库名称:", self.db_name_edit)
-        db_form_layout.addRow("用户名:", self.db_user_edit)
-        db_form_layout.addRow("密码:", self.db_password_edit)
+        # 添加分隔线
+        line = QFrame(self.db_config_tab)
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        db_config_layout.addRow(line)
         
-        # 添加额外的数据库配置选项
-        self.db_batch_size_edit = QLineEdit("100")
-        self.db_timeout_edit = QLineEdit("30")
+        # 创建表单字段
+        self.db_server_edit = QLineEdit(self.db_config_tab)
+        self.db_name_edit = QLineEdit(self.db_config_tab)
+        self.db_user_edit = QLineEdit(self.db_config_tab)
+        self.db_password_edit = QLineEdit(self.db_config_tab)
+        self.db_password_edit.setEchoMode(QLineEdit.EchoMode.Password)  # 密码模式
+        self.db_batch_size_edit = QLineEdit(self.db_config_tab)
+        self.db_batch_size_edit.setText("100")  # 默认值
+        self.db_timeout_edit = QLineEdit(self.db_config_tab)
+        self.db_timeout_edit.setText("30")  # 默认值
         
-        # 创建高级配置区域
-        advanced_group = QGroupBox("高级配置")
-        advanced_layout = QFormLayout()
-        advanced_layout.addRow("批处理大小:", self.db_batch_size_edit)
-        advanced_layout.addRow("连接超时(秒):", self.db_timeout_edit)
-        advanced_group.setLayout(advanced_layout)
+        # 添加到表单
+        db_config_layout.addRow("服务器地址:", self.db_server_edit)
+        db_config_layout.addRow("数据库名称:", self.db_name_edit)
+        db_config_layout.addRow("用户名:", self.db_user_edit)
+        db_config_layout.addRow("密码:", self.db_password_edit)
+        db_config_layout.addRow("批处理大小:", self.db_batch_size_edit)
+        db_config_layout.addRow("超时时间(秒):", self.db_timeout_edit)
         
-        db_form_group.setLayout(db_form_layout)
-        db_config_layout.addWidget(db_form_group)
-        db_config_layout.addWidget(advanced_group)
+        # 按钮区域
+        buttons_layout = QHBoxLayout()
         
-        # 测试连接和保存按钮
-        button_layout = QHBoxLayout()
-        
-        self.test_db_button = QPushButton("测试连接")
-        self.test_db_button.clicked.connect(self.on_test_db_clicked)
-        
-        self.save_db_config_button = QPushButton("保存配置")
+        # 保存按钮
+        self.save_db_config_button = QPushButton("保存配置", self.db_config_tab)
         self.save_db_config_button.clicked.connect(self.on_save_db_config_clicked)
         
-        self.view_schema_button = QPushButton("查看表结构")
-        self.view_schema_button.clicked.connect(self.on_view_schema_clicked)
+        # 测试连接按钮
+        self.test_db_connection_button = QPushButton("测试连接", self.db_config_tab)
+        self.test_db_connection_button.clicked.connect(self.on_test_db_connection_clicked)
         
-        button_layout.addWidget(self.test_db_button)
-        button_layout.addWidget(self.save_db_config_button)
-        button_layout.addWidget(self.view_schema_button)
+        # 查看数据结构按钮
+        self.view_db_schema_button = QPushButton("查看表结构", self.db_config_tab)
+        self.view_db_schema_button.clicked.connect(self.on_view_db_schema_clicked)
         
-        db_config_layout.addLayout(button_layout)
+        # 添加按钮到布局
+        buttons_layout.addWidget(self.save_db_config_button)
+        buttons_layout.addWidget(self.test_db_connection_button)
+        buttons_layout.addWidget(self.view_db_schema_button)
         
-        # 连接状态和表结构显示
-        status_group = QGroupBox("数据库信息")
-        status_layout = QVBoxLayout()
-        
-        self.db_status_label = QLabel("未连接")
-        status_layout.addWidget(self.db_status_label)
+        db_config_layout.addRow(buttons_layout)
         
         # 添加表结构显示区域
-        self.schema_text = QTextEdit()
+        schema_group = QGroupBox("数据库表结构", self.db_config_tab)
+        schema_layout = QVBoxLayout(schema_group)
+        
+        self.schema_text = QTextEdit(schema_group)
         self.schema_text.setReadOnly(True)
         self.schema_text.setMinimumHeight(200)
         self.schema_text.setPlaceholderText("点击「查看表结构」按钮查看数据库表结构...")
-        status_layout.addWidget(self.schema_text)
+        schema_layout.addWidget(self.schema_text)
         
-        status_group.setLayout(status_layout)
-        db_config_layout.addWidget(status_group)
+        db_config_layout.addRow(schema_group)
         
-        # 加载现有数据库配置
+        # 尝试加载现有配置
         self.load_db_config()
-        
-        # 设置弹性布局
-        db_config_layout.addStretch(1)
     
     def load_accounts(self):
         """加载所有配置的账号"""
@@ -475,101 +478,131 @@ class MainWindow(QMainWindow):
             self.config_account_combo.removeItem(index)
     
     def load_db_config(self):
-        """加载数据库配置"""
+        """加载现有的数据库配置"""
         try:
-            from config import CONFIG
-            db_config = CONFIG.get('db', {})
+            import os
+            import json
+            from config import load_db_config
             
-            self.db_server_edit.setText(db_config.get('server', ''))
-            self.db_name_edit.setText(db_config.get('database', ''))
-            self.db_user_edit.setText(db_config.get('username', ''))
-            self.db_password_edit.setText(db_config.get('password', ''))
+            # 使用配置加载函数
+            db_config = load_db_config()
             
-            # 加载高级配置项
-            self.db_batch_size_edit.setText(db_config.get('batch_size', '100'))
-            self.db_timeout_edit.setText(db_config.get('timeout', '30'))
-            
-            logger.info("已加载数据库配置")
+            if db_config:
+                # 填充表单
+                self.db_server_edit.setText(db_config.get('server', ''))
+                self.db_name_edit.setText(db_config.get('database', ''))
+                self.db_user_edit.setText(db_config.get('username', ''))
+                self.db_password_edit.setText(db_config.get('password', ''))
+                self.db_batch_size_edit.setText(db_config.get('batch_size', '100'))
+                self.db_timeout_edit.setText(db_config.get('timeout', '30'))
+                
+                logger.info("已加载数据库配置")
         except Exception as e:
             logger.error(f"加载数据库配置失败: {str(e)}")
     
-    def on_test_db_clicked(self):
+    def on_test_db_connection_clicked(self):
         """测试数据库连接"""
         db_config = self.get_db_config()
         
-        # 创建临时的数据库管理器测试连接
-        from modules.database_manager import DatabaseManager
-        db_manager = DatabaseManager(
-            server=db_config['server'],
-            database=db_config['database'],
-            username=db_config['username'],
-            password=db_config['password']
-        )
-        
-        test_result = db_manager.test_connection()
-        
-        if test_result.get('success'):
-            self.db_status_label.setText("连接成功")
-            self.db_status_label.setStyleSheet("color: green;")
-            self.show_message("连接测试", "数据库连接成功！")
-        else:
-            self.db_status_label.setText(f"连接失败: {test_result.get('message')}")
-            self.db_status_label.setStyleSheet("color: red;")
-            self.show_message("连接测试", f"数据库连接失败: {test_result.get('message')}", QMessageBox.Icon.Warning)
+        try:
+            # 创建临时的数据库管理器
+            from modules.database_manager import DatabaseManager
+            db_manager = DatabaseManager(
+                server=db_config['server'],
+                database=db_config['database'],
+                username=db_config['username'],
+                password=db_config['password']
+            )
+            
+            # 测试连接
+            test_result = db_manager.test_connection()
+            if test_result.get('success'):
+                self.show_message("连接成功", "数据库连接测试成功", QMessageBox.Icon.Information)
+            else:
+                self.show_message("连接失败", test_result.get('message'), QMessageBox.Icon.Warning)
+        except Exception as e:
+            logger.error(f"测试数据库连接失败: {str(e)}")
+            self.show_message("连接失败", f"数据库连接测试失败: {str(e)}", QMessageBox.Icon.Critical)
     
-    def on_save_db_config_clicked(self):
-        """保存数据库配置"""
+    def on_view_db_schema_clicked(self):
+        """查看数据库表结构"""
         db_config = self.get_db_config()
         
+        for key, value in db_config.items():
+            if key in ['server', 'database', 'username', 'password'] and not value:
+                self.show_message("配置不完整", f"请填写 {key} 字段", QMessageBox.Icon.Warning)
+                return
+        
         try:
-            # 读取当前配置文件
-            import json
-            with open('config.py', 'r', encoding='utf-8') as f:
-                config_content = f.read()
+            # 创建临时的数据库管理器
+            from modules.database_manager import DatabaseManager
+            db_manager = DatabaseManager(
+                server=db_config['server'],
+                database=db_config['database'],
+                username=db_config['username'],
+                password=db_config['password']
+            )
             
-            # 使用简单的字符串替换（真实场景应使用AST更安全）
-            new_server = f"'server': '{db_config['server']}'"
-            new_database = f"'database': '{db_config['database']}'"
-            new_username = f"'username': '{db_config['username']}'"
-            new_password = f"'password': '{db_config['password']}'"
-            new_batch_size = f"'batch_size': '{db_config['batch_size']}'"
-            new_timeout = f"'timeout': '{db_config['timeout']}'"
+            # 测试连接
+            test_result = db_manager.test_connection()
+            if not test_result.get('success'):
+                self.show_message("连接失败", test_result.get('message'), QMessageBox.Icon.Warning)
+                return
             
-            # 替换配置
-            import re
-            config_content = re.sub(r"'server'\s*:\s*'[^']*'", new_server, config_content)
-            config_content = re.sub(r"'database'\s*:\s*'[^']*'", new_database, config_content)
-            config_content = re.sub(r"'username'\s*:\s*'[^']*'", new_username, config_content)
-            config_content = re.sub(r"'password'\s*:\s*'[^']*'", new_password, config_content)
+            # 连接数据库并获取表结构
+            import pyodbc
+            conn = pyodbc.connect(db_manager.connection_string)
+            cursor = conn.cursor()
             
-            # 检查是否已存在高级配置项
-            if "'batch_size'" not in config_content:
-                # 在db配置项最后添加批处理大小配置
-                config_content = re.sub(r"('db'\s*:\s*{[^}]*?)}", r"\1, 'batch_size': '100'}", config_content)
-            else:
-                config_content = re.sub(r"'batch_size'\s*:\s*'[^']*'", new_batch_size, config_content)
+            # 获取主表结构
+            schema_text = "=== 订单主表 (jx_orders_master) ===\n\n"
+            cursor.execute("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jx_orders_master' ORDER BY ORDINAL_POSITION")
             
-            if "'timeout'" not in config_content:
-                # 在db配置项最后添加超时配置
-                config_content = re.sub(r"('db'\s*:\s*{[^}]*?)}", r"\1, 'timeout': '30'}", config_content)
-            else:
-                config_content = re.sub(r"'timeout'\s*:\s*'[^']*'", new_timeout, config_content)
+            for row in cursor.fetchall():
+                col_name = row.COLUMN_NAME
+                data_type = row.DATA_TYPE
+                length = row.CHARACTER_MAXIMUM_LENGTH
+                
+                if length:
+                    schema_text += f"{col_name}: {data_type}({length})\n"
+                else:
+                    schema_text += f"{col_name}: {data_type}\n"
             
-            # 写回配置文件
-            with open('config.py', 'w', encoding='utf-8') as f:
-                f.write(config_content)
+            # 获取明细表结构
+            schema_text += "\n\n=== 订单明细表 (jx_orders_detail) ===\n\n"
+            cursor.execute("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jx_orders_detail' ORDER BY ORDINAL_POSITION")
             
-            # 重新加载配置
-            self.reload_config()
+            for row in cursor.fetchall():
+                col_name = row.COLUMN_NAME
+                data_type = row.DATA_TYPE
+                length = row.CHARACTER_MAXIMUM_LENGTH
+                
+                if length:
+                    schema_text += f"{col_name}: {data_type}({length})\n"
+                else:
+                    schema_text += f"{col_name}: {data_type}\n"
             
-            # 发送数据库配置更新信号
-            self.update_db_config_signal.emit()
+            # 获取记录计数
+            cursor.execute("SELECT COUNT(*) AS count FROM jx_orders_master")
+            master_count = cursor.fetchone().count
             
-            logger.info("数据库配置已保存")
-            self.show_message("保存成功", "数据库配置已成功保存")
+            cursor.execute("SELECT COUNT(*) AS count FROM jx_orders_detail")
+            detail_count = cursor.fetchone().count
+            
+            schema_text += f"\n\n=== 数据统计 ===\n"
+            schema_text += f"主表记录数: {master_count}\n"
+            schema_text += f"明细表记录数: {detail_count}\n"
+            
+            conn.close()
+            
+            # 显示表结构
+            self.schema_text.setText(schema_text)
+            logger.info("已查询并显示数据库表结构")
+            
         except Exception as e:
-            logger.error(f"保存数据库配置失败: {str(e)}")
-            self.show_message("保存失败", f"数据库配置保存失败: {str(e)}", QMessageBox.Icon.Critical)
+            logger.error(f"获取表结构失败: {str(e)}")
+            self.schema_text.setText(f"获取表结构失败: {str(e)}")
+            self.show_message("查询失败", f"获取表结构失败: {str(e)}", QMessageBox.Icon.Warning)
     
     def get_db_config(self):
         """获取数据库配置表单的值"""
@@ -689,86 +722,6 @@ class MainWindow(QMainWindow):
         # 将滚动区域添加到主布局
         about_layout.addWidget(scroll_area)
     
-    def on_view_schema_clicked(self):
-        """查看数据库表结构"""
-        db_config = self.get_db_config()
-        
-        # 检查是否有必要的数据库连接信息
-        if not db_config['server'] or not db_config['database']:
-            self.show_message("错误", "请先填写服务器地址和数据库名称", QMessageBox.Icon.Warning)
-            return
-        
-        try:
-            # 创建临时的数据库管理器
-            from modules.database_manager import DatabaseManager
-            db_manager = DatabaseManager(
-                server=db_config['server'],
-                database=db_config['database'],
-                username=db_config['username'],
-                password=db_config['password']
-            )
-            
-            # 测试连接
-            test_result = db_manager.test_connection()
-            if not test_result.get('success'):
-                self.show_message("连接失败", test_result.get('message'), QMessageBox.Icon.Warning)
-                return
-            
-            # 连接数据库并获取表结构
-            import pyodbc
-            conn = pyodbc.connect(db_manager.connection_string)
-            cursor = conn.cursor()
-            
-            # 获取主表结构
-            schema_text = "=== 订单主表 (jx_orders_master) ===\n\n"
-            cursor.execute("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jx_orders_master' ORDER BY ORDINAL_POSITION")
-            
-            for row in cursor.fetchall():
-                col_name = row.COLUMN_NAME
-                data_type = row.DATA_TYPE
-                length = row.CHARACTER_MAXIMUM_LENGTH
-                
-                if length:
-                    schema_text += f"{col_name}: {data_type}({length})\n"
-                else:
-                    schema_text += f"{col_name}: {data_type}\n"
-            
-            # 获取明细表结构
-            schema_text += "\n\n=== 订单明细表 (jx_orders_detail) ===\n\n"
-            cursor.execute("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jx_orders_detail' ORDER BY ORDINAL_POSITION")
-            
-            for row in cursor.fetchall():
-                col_name = row.COLUMN_NAME
-                data_type = row.DATA_TYPE
-                length = row.CHARACTER_MAXIMUM_LENGTH
-                
-                if length:
-                    schema_text += f"{col_name}: {data_type}({length})\n"
-                else:
-                    schema_text += f"{col_name}: {data_type}\n"
-            
-            # 获取记录计数
-            cursor.execute("SELECT COUNT(*) AS count FROM jx_orders_master")
-            master_count = cursor.fetchone().count
-            
-            cursor.execute("SELECT COUNT(*) AS count FROM jx_orders_detail")
-            detail_count = cursor.fetchone().count
-            
-            schema_text += f"\n\n=== 数据统计 ===\n"
-            schema_text += f"主表记录数: {master_count}\n"
-            schema_text += f"明细表记录数: {detail_count}\n"
-            
-            conn.close()
-            
-            # 显示表结构
-            self.schema_text.setText(schema_text)
-            logger.info("已查询并显示数据库表结构")
-            
-        except Exception as e:
-            logger.error(f"获取表结构失败: {str(e)}")
-            self.schema_text.setText(f"获取表结构失败: {str(e)}")
-            self.show_message("查询失败", f"获取表结构失败: {str(e)}", QMessageBox.Icon.Warning)
-    
     def is_dark_mode(self):
         """检测是否为深色模式"""
         palette = self.palette()
@@ -779,3 +732,34 @@ class MainWindow(QMainWindow):
     def apply_theme(self):
         """应用主题样式"""
         # 已移除全局样式应用，仅在关于页面适配深色模式 
+    
+    def on_save_db_config_clicked(self):
+        """保存数据库配置"""
+        db_config = self.get_db_config()
+        
+        # 验证配置是否填写完整
+        for key, value in db_config.items():
+            if key in ['server', 'database', 'username', 'password'] and not value:
+                self.show_message("配置不完整", f"请填写 {key} 字段", QMessageBox.Icon.Warning)
+                return
+        
+        try:
+            import os
+            import json
+            
+            # 获取程序所在目录
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            db_config_path = os.path.join(base_dir, 'database_config.json')
+            
+            # 将配置保存到JSON文件
+            with open(db_config_path, 'w', encoding='utf-8') as f:
+                json.dump(db_config, f, ensure_ascii=False, indent=4)
+            
+            # 发送数据库配置更新信号
+            self.update_db_config_signal.emit()
+            
+            logger.info("数据库配置已保存")
+            self.show_message("保存成功", "数据库配置已成功保存")
+        except Exception as e:
+            logger.error(f"保存数据库配置失败: {str(e)}")
+            self.show_message("保存失败", f"数据库配置保存失败: {str(e)}", QMessageBox.Icon.Critical) 

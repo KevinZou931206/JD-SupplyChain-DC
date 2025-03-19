@@ -13,11 +13,12 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QDate, Qt, QObject, QThread, pyqtSignal, pyqtSlot
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import json
 
 from ui import MainWindow, VerificationDialog
 from modules import BrowserAutomation, ApiClient, DataProcessor, DatabaseManager, CacheManager, AccountManager
 from modules import UILogHandler, LogSignal, setup_logging, get_logger
-from config import CONFIG
+from config import CONFIG, load_db_config
 
 # 创建日志信号对象
 log_signal = LogSignal()
@@ -76,12 +77,26 @@ class MainApp(QObject):
         self.data_processor = DataProcessor(
             download_dir=CONFIG['paths']['download_dir']
         )
+
+        # 从函数加载数据库配置
+        db_config = load_db_config()
+        
+        # 如果数据库配置为空，提示用户
+        if not db_config:
+            logger.warning("数据库配置不存在或为空，请在数据库配置标签页中设置正确的连接信息")
+            QMessageBox.warning(self.window, "数据库配置缺失", 
+                              "数据库配置不存在或为空，请在「数据库配置」标签页中设置正确的连接信息")
+
+        # 创建数据库管理器
         self.db_manager = DatabaseManager(
-            server=CONFIG['db']['server'],
-            database=CONFIG['db']['database'],
-            username=CONFIG['db']['username'],
-            password=CONFIG['db']['password']
+            server=db_config.get('server', ''),
+            database=db_config.get('database', ''),
+            username=db_config.get('username', ''),
+            password=db_config.get('password', ''),
+            batch_size=db_config.get('batch_size', '100'),
+            timeout=db_config.get('timeout', '30')
         )
+
         self.cache_manager = CacheManager(
             cache_dir=CONFIG['paths']['cache_dir'],
             download_dir=CONFIG['paths']['download_dir']
@@ -340,17 +355,22 @@ class MainApp(QObject):
     def update_db_config(self):
         """更新数据库配置"""
         try:
-            # 重新加载配置文件
-            import importlib
-            import config
-            importlib.reload(config)
+            # 从函数加载数据库配置
+            db_config = load_db_config()
+            
+            # 检查配置是否为空
+            if not db_config:
+                logger.warning("数据库配置不存在或为空")
+                return
             
             # 更新数据库管理器的连接参数
             self.db_manager = DatabaseManager(
-                server=config.CONFIG['db']['server'],
-                database=config.CONFIG['db']['database'],
-                username=config.CONFIG['db']['username'],
-                password=config.CONFIG['db']['password']
+                server=db_config.get('server', ''),
+                database=db_config.get('database', ''),
+                username=db_config.get('username', ''),
+                password=db_config.get('password', ''),
+                batch_size=db_config.get('batch_size', '100'),
+                timeout=db_config.get('timeout', '30')
             )
             logger.info("数据库配置已更新")
         except Exception as e:
